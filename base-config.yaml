@@ -1,0 +1,37 @@
+screening_room: "!screening"
+space_room: "!space"
+application_pings:
+- "@user:example.com"
+
+messages:
+    prefix: >
+        Hello {user}, welcome to the Muninn-Hall screening room.
+    recheck_prefix: >
+        Recheck complete:
+    suffix: >
+        If you want to apply on behalf of another server, either join with an account from that
+        server (preferably one listed in the support record), or send <code>!apply</code>
+        followed by an explanation to start a manual application.
+
+    new_is_listed_support: >
+        You are listed in the <code>.well-known</code> support record for {server}. If you wish to
+        apply for membership on behalf of {server}, just react to this message with👍️.
+    new_not_listed_support: >
+        You are not listed in the <code>.well-known</code> support record for {server}. If you wish
+        to apply for membership on behalf of {server}, please configure
+        <a href="https://spec.matrix.org/v1.15/client-server-api/#getwell-knownmatrixsupport">
+        the <code>.well-known</code> support record</a> to include your Matrix user ID first, then
+        send <code>!recheck</code> here to restart the process.
+    new_well_known_missing: |
+        Your server ({server}) has no <code>.well-known</code> support record or it's malformed.
+        If you wish to apply for membership on behalf of {server}, please configure
+        <a href="https://spec.matrix.org/v1.15/client-server-api/#getwell-knownmatrixsupport">
+        the <code>.well-known</code> support record</a> to include your Matrix user ID first, then
+        send <code>!recheck</code> here to restart the process.
+    member_is_listed_support: |
+        {server} is already part of the Muninn-Hall and you are listed in the
+        <code>.well-known</code> support record. Please ask your other admins to invite
+        you to the space.
+    member_not_listed_support: |
+        {server} is already part of the Muninn-Hall, but you are not listed in the
+        <code>.well-known</code> support record.

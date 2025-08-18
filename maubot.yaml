@@ -1,0 +1,10 @@
+maubot: 0.5.2
+id: com.muninn-hall.maubot
+version: 1.0.0
+license: AGPL-3.0-or-later
+modules:
+- muninnbot
+main_class: MuninnBot
+extra_files:
+- base-config.yaml
+config: true
