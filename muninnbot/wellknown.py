@@ -64,4 +64,4 @@ async def fetch_support_well_known(sess: ClientSession, server_name: str) -> Sup
     url = f"https://{server_name}/.well-known/matrix/support"
     async with sess.get(url) as resp:
         resp.raise_for_status()
-        return SupportWellKnown.deserialize(await resp.json())
+        return SupportWellKnown.deserialize(await resp.json(content_type=None))
