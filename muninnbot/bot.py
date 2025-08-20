@@ -20,7 +20,7 @@ import html
 from maubot import MessageEvent, Plugin
 from maubot.handlers import command, event
 from maubot.matrix import parse_formatted
-from mautrix.client import InternalEventType, MembershipEventDispatcher
+from mautrix.client import InternalEventType, MembershipEventDispatcher, SyncStream
 from mautrix.types import (
     EventID,
     EventType,
@@ -87,6 +87,8 @@ class MuninnBot(Plugin):
 
     @event.on(InternalEventType.JOIN)
     async def handle_member(self, evt: StateEvent) -> None:
+        if not evt.source & SyncStream.TIMELINE:
+            return
         if evt.room_id == self.config["screening_room"]:
             if (
                 evt.sender in self.space_members
