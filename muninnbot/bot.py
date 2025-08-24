@@ -58,6 +58,7 @@ class Config(BaseProxyConfig):
         helper.copy("messages.new_well_known_missing")
         helper.copy("messages.member_is_listed_support")
         helper.copy("messages.member_not_listed_support")
+        helper.copy("messages.name_not_set")
 
 
 class JoinType(Enum):

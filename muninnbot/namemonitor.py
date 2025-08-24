@@ -14,6 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 from typing import TYPE_CHECKING
+import html
 import re
 
 from maubot import MessageEvent
@@ -86,13 +87,15 @@ class NameMonitor:
     @command.new("ping-users-without-server-in-name")
     async def ping_users_without_server_in_name(self, evt: MessageEvent) -> None:
         user_ids = []
-        markdowns = []
+        htmls = []
         for user_id, servers in self.mxid_to_servers.items():
             if servers:
                 continue
             user_ids.append(user_id)
-            markdowns.append(
-                f"[{self.member_names[user_id]}]({MatrixURI.build(user_id).matrix_to_url})"
+            htmls.append(
+                f'<a href="{MatrixURI.build(user_id).matrix_to_url}">'
+                f"{html.escape(self.member_names[user_id])}"
+                "</a>"
             )
         if not user_ids:
             await evt.react("✅️")
@@ -102,11 +105,13 @@ class NameMonitor:
             self.bot.config["alerts_room"],
             via=self.bot.config["room_via"],
         ).matrix_to_url
+
         content.body, content.formatted_body = await parse_formatted(
-            f"{", ".join(markdowns)}: you don't have your displayname configured properly. "
-            "Please add the name(s) of the server(s) you're a staff member of to your room nick "
-            "in square brackets, e.g. `/myroomnick Muumipeikko [maunium.net, beeper.com]`. "
-            f"Make sure to set the room nick both here and in [the alerts room]({alerts_link})."
+            self.bot.config["messages.name_not_set"].format(
+                mentions_html=", ".join(htmls), alerts_link=alerts_link
+            ),
+            allow_html=True,
+            render_markdown=False,
         )
         content["m.mentions"] = {"user_ids": user_ids}
         await evt.reply(content)

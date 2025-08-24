@@ -40,3 +40,9 @@ messages:
     member_not_listed_support: |
         {server} is already part of the Muninn Hall, but you are not listed in the
         <code>.well-known</code> support record.
+
+    name_not_set: |
+        {mentions_html}: you don't have your displayname configured properly. Please add the
+        name(s) of the server(s) you're a staff member of to your room nick in square brackets,
+        e.g. <code>/myroomnick Muumipeikko [maunium.net, beeper.com]</code>. Make sure to set the
+        room nick both here and in [the alerts room]({alerts_link}).
