@@ -13,7 +13,6 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
-from typing import Awaitable
 from enum import Enum
 import html
 
@@ -37,6 +36,7 @@ from mautrix.types import (
 )
 from mautrix.util.config import BaseProxyConfig, ConfigUpdateHelper
 
+from .namemonitor import NameMonitor
 from .wellknown import fetch_support_well_known
 
 
@@ -44,7 +44,11 @@ class Config(BaseProxyConfig):
     def do_update(self, helper: ConfigUpdateHelper) -> None:
         helper.copy("screening_room")
         helper.copy("space_room")
+        helper.copy("main_room")
+        helper.copy("alerts_room")
+        helper.copy("room_via")
         helper.copy("application_pings")
+        helper.copy("excluded_members")
 
         helper.copy("messages.prefix")
         helper.copy("messages.recheck_prefix")
@@ -52,7 +56,7 @@ class Config(BaseProxyConfig):
         helper.copy("messages.new_is_listed_support")
         helper.copy("messages.new_not_listed_support")
         helper.copy("messages.new_well_known_missing")
-        helper.copy("messages.member_listed_support")
+        helper.copy("messages.member_is_listed_support")
         helper.copy("messages.member_not_listed_support")
 
 
@@ -72,18 +76,26 @@ class MuninnBot(Plugin):
     pending_applications: dict[EventID, UserID | None]
     welcomed_users: set[UserID]
     welcomed_servers: set[str]
+    name_monitor: NameMonitor
 
     @classmethod
     def get_config_class(cls) -> type[BaseProxyConfig]:
         return Config
 
     async def start(self) -> None:
+        self.name_monitor = NameMonitor(self)
         self.on_external_config_update()
+        await self.name_monitor.start()
+        self.register_handler_class(self.name_monitor)
         self.client.add_dispatcher(MembershipEventDispatcher)
         self.pending_applications = {}
         self.welcomed_users = set()
         self.space_members = {}
         self.space_members = await self.client.get_joined_members(self.config["space_room"])
+
+    def on_external_config_update(self) -> None:
+        self.config.load_and_update()
+        self.name_monitor.read_config()
 
     @event.on(InternalEventType.JOIN)
     async def handle_member(self, evt: StateEvent) -> None:

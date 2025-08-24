@@ -1,11 +1,16 @@
 screening_room: "!screening"
 space_room: "!space"
+main_room: "!main"
+alerts_room: "!alerts"
+room_via: ["example.com"]
 application_pings:
 - "@user:example.com"
+excluded_members:
+- "@admin:example.com"
 
 messages:
     prefix: >
-        Hello {user}, welcome to the Muninn-Hall screening room.
+        Hello {user}, welcome to the Muninn Hall screening room.
     recheck_prefix: >
         Recheck complete:
     suffix: >
@@ -33,5 +38,5 @@ messages:
         <code>.well-known</code> support record. Please ask your other admins to invite
         you to the space.
     member_not_listed_support: |
-        {server} is already part of the Muninn-Hall, but you are not listed in the
+        {server} is already part of the Muninn Hall, but you are not listed in the
         <code>.well-known</code> support record.

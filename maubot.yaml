@@ -7,4 +7,5 @@ modules:
 main_class: MuninnBot
 extra_files:
 - base-config.yaml
+- tlds-alpha-by-domain.txt
 config: true

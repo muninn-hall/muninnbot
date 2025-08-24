@@ -1,0 +1,163 @@
+# muninnbot - A welcome bot for Muninn Hall
+# Copyright (C) 2025 Tulir Asokan
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+from typing import TYPE_CHECKING
+import re
+
+from maubot import MessageEvent
+from maubot.handlers import command, event
+from maubot.matrix import parse_formatted
+from mautrix.types import (
+    EventType,
+    Format,
+    MatrixURI,
+    Membership,
+    MessageType,
+    StateEvent,
+    TextMessageEventContent,
+    UserID,
+)
+from mautrix.util import background_task
+
+if TYPE_CHECKING:
+    from .bot import MuninnBot
+
+
+bracket_regex = re.compile(r"\[(.+?)]")
+separator_regex = re.compile(r"[, /]")
+
+
+class NameMonitor:
+    bot: "MuninnBot"
+    tlds: set[str]
+    member_names: dict[UserID, str]
+    mxid_to_servers: dict[UserID, set[str]]
+    server_to_mxids: dict[str, set[UserID]]
+    excluded_members: set[UserID]
+
+    def __init__(self, bot: "MuninnBot") -> None:
+        self.bot = bot
+        self.tlds = set()
+        self.member_names = {}
+        self.mxid_to_servers = {}
+        self.server_to_mxids = {}
+
+    def read_config(self) -> None:
+        self.excluded_members = set(self.bot.config["excluded_members"])
+
+    async def start(self) -> None:
+        self.tlds = {
+            tld.decode("utf-8").lower()
+            for tld in (await self.bot.loader.read_file("tlds-alpha-by-domain.txt")).split(b"\n")
+            if tld and not tld.startswith(b"#")
+        }
+        background_task.create(self.load_members())
+
+    async def load_members(self) -> None:
+        members = await self.bot.client.get_joined_members(self.bot.config["main_room"])
+        for user_id, member in members.items():
+            if user_id in self.excluded_members:
+                continue
+            self.member_names[user_id] = member.displayname
+            self._update_member(user_id, self.parse_name(member.displayname))
+
+    @command.new("member-directory")
+    async def get_member_directory(self, evt: MessageEvent) -> None:
+        await evt.reply(
+            "\n".join(
+                f"* [{self.member_names[user_id]}]({MatrixURI.build(user_id).matrix_to_url}): "
+                + (f"`{"`, `".join(servers)}`" if servers else "*none found*")
+                for user_id, servers in self.mxid_to_servers.items()
+            )
+        )
+
+    @command.new("ping-users-without-server-in-name")
+    async def ping_users_without_server_in_name(self, evt: MessageEvent) -> None:
+        user_ids = []
+        markdowns = []
+        for user_id, servers in self.mxid_to_servers.items():
+            if servers:
+                continue
+            user_ids.append(user_id)
+            markdowns.append(
+                f"[{self.member_names[user_id]}]({MatrixURI.build(user_id).matrix_to_url})"
+            )
+        if not user_ids:
+            await evt.react("✅️")
+            return
+        content = TextMessageEventContent(msgtype=MessageType.TEXT, format=Format.HTML)
+        alerts_link = MatrixURI.build(
+            self.bot.config["alerts_room"],
+            via=self.bot.config["room_via"],
+        ).matrix_to_url
+        content.body, content.formatted_body = await parse_formatted(
+            f"{", ".join(markdowns)}: you don't have your displayname configured properly. "
+            "Please add the name(s) of the server(s) you're a staff member of to your room nick "
+            "in square brackets, e.g. `/myroomnick Muumipeikko [maunium.net, beeper.com]`. "
+            f"Make sure to set the room nick both here and in [the alerts room]({alerts_link})."
+        )
+        content["m.mentions"] = {"user_ids": user_ids}
+        await evt.reply(content)
+
+    @event.on(EventType.ROOM_MEMBER)
+    async def handle_member(self, evt: StateEvent) -> None:
+        if evt.room_id != self.bot.config["main_room"]:
+            return
+        user_id = UserID(evt.state_key)
+        if user_id in self.excluded_members:
+            return
+        if evt.content.membership != Membership.JOIN:
+            self._remove_member(user_id)
+            return
+        self.member_names[user_id] = evt.content.displayname
+        self._update_member(user_id, self.parse_name(evt.content.displayname))
+
+    def parse_name(self, name: str) -> set[str]:
+        output = set()
+        for chunk in bracket_regex.finditer(name or ""):
+            for word in separator_regex.split(chunk.group(1)):
+                if "." not in word:
+                    continue
+                word = word.lower()
+                tld = word.rsplit(".", 1)[1]
+                if tld not in self.tlds:
+                    continue
+                output.add(word)
+        return output
+
+    def _update_member(self, user_id: UserID, new_servers: set[str]) -> None:
+        old_servers = self.mxid_to_servers.get(user_id, set())
+        self.mxid_to_servers[user_id] = new_servers
+        if new_servers == old_servers:
+            return
+        for server in old_servers - new_servers:
+            self._remove_member_from_server(server, user_id)
+        for server in new_servers - old_servers:
+            self._add_member_to_server(server, user_id)
+
+    def _remove_member(self, user_id: UserID) -> None:
+        servers = self.mxid_to_servers.pop(user_id, set())
+        for server in servers:
+            self._remove_member_from_server(server, user_id)
+
+    def _remove_member_from_server(self, server: str, user_id: UserID) -> None:
+        server_mxids = self.server_to_mxids.get(server)
+        if server_mxids:
+            server_mxids.remove(user_id)
+            if not server_mxids:
+                del self.server_to_mxids[server]
+
+    def _add_member_to_server(self, server: str, user_id: UserID) -> None:
+        self.server_to_mxids.setdefault(server, set()).add(user_id)
