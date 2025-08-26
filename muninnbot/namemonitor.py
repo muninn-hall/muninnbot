@@ -19,17 +19,7 @@ import re
 
 from maubot import MessageEvent
 from maubot.handlers import command, event
-from maubot.matrix import parse_formatted
-from mautrix.types import (
-    EventType,
-    Format,
-    MatrixURI,
-    Membership,
-    MessageType,
-    StateEvent,
-    TextMessageEventContent,
-    UserID,
-)
+from mautrix.types import EventType, MatrixURI, Membership, StateEvent, UserID
 from mautrix.util import background_task
 
 if TYPE_CHECKING:
@@ -81,7 +71,8 @@ class NameMonitor:
                 f"* [{self.member_names[user_id]}]({MatrixURI.build(user_id).matrix_to_url}): "
                 + (f"`{"`, `".join(servers)}`" if servers else "*none found*")
                 for user_id, servers in self.mxid_to_servers.items()
-            )
+            ),
+            extra_content={"m.mentions": {}},
         )
 
     @command.new("ping-users-without-server-in-name")
@@ -100,21 +91,16 @@ class NameMonitor:
         if not user_ids:
             await evt.react("✅️")
             return
-        content = TextMessageEventContent(msgtype=MessageType.TEXT, format=Format.HTML)
         alerts_link = MatrixURI.build(
             self.bot.config["alerts_room"],
             via=self.bot.config["room_via"],
         ).matrix_to_url
-
-        content.body, content.formatted_body = await parse_formatted(
+        await evt.reply(
             self.bot.config["messages.name_not_set"].format(
                 mentions_html=", ".join(htmls), alerts_link=alerts_link
             ),
-            allow_html=True,
-            render_markdown=False,
+            extra_content={"m.mentions": {"user_ids": user_ids}},
         )
-        content["m.mentions"] = {"user_ids": user_ids}
-        await evt.reply(content)
 
     @event.on(EventType.ROOM_MEMBER)
     async def handle_member(self, evt: StateEvent) -> None:

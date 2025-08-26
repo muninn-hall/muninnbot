@@ -45,4 +45,4 @@ messages:
         {mentions_html}: you don't have your displayname configured properly. Please add the
         name(s) of the server(s) you're a staff member of to your room nick in square brackets,
         e.g. <code>/myroomnick Muumipeikko [maunium.net, beeper.com]</code>. Make sure to set the
-        room nick both here and in [the alerts room]({alerts_link}).
+        room nick both here and in <a href="{alerts_link}">the alerts room</a>.
