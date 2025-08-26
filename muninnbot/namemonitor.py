@@ -67,12 +67,27 @@ class NameMonitor:
     @command.new("member-directory")
     async def get_member_directory(self, evt: MessageEvent) -> None:
         await evt.reply(
-            "\n".join(
-                f"* [{self.member_names[user_id]}]({MatrixURI.build(user_id).matrix_to_url}): "
-                + (f"`{"`, `".join(servers)}`" if servers else "*none found*")
+            "<details><summary>Member Directory</summary><ul>"
+            + "".join(
+                f"<li><a href='{MatrixURI.build(user_id).matrix_to_url}'>{self.member_names[user_id]}</a>: "
+                + (
+                    f"<code>{"</code>, <code>".join(servers)}</code>"
+                    if servers
+                    else "<em>none found</em>"
+                )
+                + "</li>"
                 for user_id, servers in self.mxid_to_servers.items()
-            ),
-            extra_content={"m.mentions": {}},
+            )
+            + "</ul></details>",
+            extra_content={
+                "body": "Member Directory - plaintext body not available",
+                "m.mentions": {},
+                "com.muninn-hall.member_directory": {
+                    server: list(user_ids) for server, user_ids in self.server_to_mxids.items()
+                },
+            },
+            allow_html=True,
+            markdown=False,
         )
 
     @command.new("ping-users-without-server-in-name")
@@ -100,6 +115,8 @@ class NameMonitor:
                 mentions_html=", ".join(htmls), alerts_link=alerts_link
             ),
             extra_content={"m.mentions": {"user_ids": user_ids}},
+            allow_html=True,
+            markdown=False,
         )
 
     @event.on(EventType.ROOM_MEMBER)
