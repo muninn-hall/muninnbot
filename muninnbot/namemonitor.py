@@ -139,8 +139,8 @@ class NameMonitor:
                 if "." not in word:
                     continue
                 word = word.lower()
-                tld = word.rsplit(".", 1)[1]
-                if tld not in self.tlds:
+                domain, tld = word.rsplit(".", 1)
+                if not domain or tld not in self.tlds:
                     continue
                 output.add(word)
         return output
