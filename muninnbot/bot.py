@@ -14,7 +14,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 from enum import Enum
+import asyncio
 import html
+import time
 
 from maubot import MessageEvent, Plugin
 from maubot.handlers import command, event
@@ -77,6 +79,9 @@ class MuninnBot(Plugin):
     pending_applications: dict[EventID, UserID | None]
     welcomed_users: dict[UserID, EventID | None]
     welcomed_servers: set[str]
+    join_lock: asyncio.Lock
+    join_limiter_count: int
+    join_limiter_ts: float
     name_monitor: NameMonitor
 
     @classmethod
@@ -92,6 +97,9 @@ class MuninnBot(Plugin):
         self.pending_applications = {}
         self.welcomed_users = {}
         self.space_members = {}
+        self.join_limiter_count = 0
+        self.join_limiter_ts = 0
+        self.join_lock = asyncio.Lock()
         self.space_members = await self.client.get_joined_members(self.config["space_room"])
 
     def on_external_config_update(self) -> None:
@@ -109,8 +117,16 @@ class MuninnBot(Plugin):
                 or evt.sender in self.welcomed_users
             ):
                 return
-            self.welcomed_users.add(evt.sender)
-            await self._check_member(evt, is_join=True)
+            async with self.join_lock:
+                if self.join_limiter_ts + 60 < time.monotonic():
+                    self.join_limiter_count = 0
+                elif self.join_limiter_count > 5:
+                    # If more than 5 members join in a minute, stop sending welcome messages
+                    self.log.warning("Not checking joined member due to rate limiting")
+                    return
+                await self._check_member(evt, is_join=True)
+                self.join_limiter_count += 1
+                self.join_limiter_ts = time.monotonic()
         elif evt.room_id == self.config["space_room"]:
             if evt.content.membership == Membership.JOIN:
                 self.space_members[evt.sender] = Member(
@@ -125,10 +141,11 @@ class MuninnBot(Plugin):
     @event.on(InternalEventType.BAN)
     async def handle_leave(self, evt: StateEvent) -> None:
         if evt.room_id == self.config["screening_room"]:
-            if evt.sender not in self.welcomed_users:
-                return
-            evt_id = self.welcomed_users[evt.sender]
-            self.welcomed_users[evt.sender] = None
+            async with self.join_lock:
+                if evt.sender not in self.welcomed_users:
+                    return
+                evt_id = self.welcomed_users[evt.sender]
+                self.welcomed_users[evt.sender] = None
             if evt_id:
                 await self.client.redact(evt.room_id, evt_id, reason="User left")
 
