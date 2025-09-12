@@ -75,7 +75,7 @@ VERIFIED_APPLICATION_SENDER_KEY = "com.muninn-hall.verified_application_sender"
 class MuninnBot(Plugin):
     space_members: dict[UserID, Member]
     pending_applications: dict[EventID, UserID | None]
-    welcomed_users: set[UserID]
+    welcomed_users: dict[UserID, EventID | None]
     welcomed_servers: set[str]
     name_monitor: NameMonitor
 
@@ -90,7 +90,7 @@ class MuninnBot(Plugin):
         self.register_handler_class(self.name_monitor)
         self.client.add_dispatcher(MembershipEventDispatcher)
         self.pending_applications = {}
-        self.welcomed_users = set()
+        self.welcomed_users = {}
         self.space_members = {}
         self.space_members = await self.client.get_joined_members(self.config["space_room"])
 
@@ -120,6 +120,17 @@ class MuninnBot(Plugin):
                 )
             elif evt.content.membership in (Membership.LEAVE, Membership.BAN):
                 self.space_members.pop(evt.sender, None)
+
+    @event.on(InternalEventType.LEAVE)
+    @event.on(InternalEventType.BAN)
+    async def handle_leave(self, evt: StateEvent) -> None:
+        if evt.room_id == self.config["screening_room"]:
+            if evt.sender not in self.welcomed_users:
+                return
+            evt_id = self.welcomed_users[evt.sender]
+            self.welcomed_users[evt.sender] = None
+            if evt_id:
+                await self.client.redact(evt.room_id, evt_id, reason="User left")
 
     @command.new("recheck")
     async def recheck_member(self, evt: MessageEvent) -> None:
@@ -212,5 +223,6 @@ class MuninnBot(Plugin):
         )
         content.set_reply(evt.event_id)
         evt_id = await self.client.send_message(evt.room_id, content)
+        self.welcomed_users.setdefault(evt.sender, evt_id)
         if join_type == JoinType.NEW_IS_LISTED_SUPPORT:
             self.pending_applications[evt_id] = evt.sender
