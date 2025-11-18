@@ -61,7 +61,7 @@ class NameMonitor:
         for user_id, member in members.items():
             if user_id in self.excluded_members:
                 continue
-            self.member_names[user_id] = member.displayname
+            self.member_names[user_id] = member.displayname or user_id
             self._update_member(user_id, self.parse_name(member.displayname))
 
     @command.new("member-directory")
@@ -129,7 +129,7 @@ class NameMonitor:
         if evt.content.membership != Membership.JOIN:
             self._remove_member(user_id)
             return
-        self.member_names[user_id] = evt.content.displayname
+        self.member_names[user_id] = evt.content.displayname or user_id
         self._update_member(user_id, self.parse_name(evt.content.displayname))
 
     def parse_name(self, name: str) -> set[str]:
