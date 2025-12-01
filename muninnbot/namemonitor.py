@@ -17,8 +17,10 @@ from typing import TYPE_CHECKING
 import html
 import re
 
+from aiohttp.web import Request, Response, json_response
+
 from maubot import MessageEvent
-from maubot.handlers import command, event
+from maubot.handlers import command, event, web
 from mautrix.types import EventType, MatrixURI, Membership, StateEvent, UserID
 from mautrix.util import background_task
 
@@ -89,6 +91,22 @@ class NameMonitor:
             allow_html=True,
             markdown=False,
         )
+
+    @web.get("/member_directory")
+    async def get_member_directory_http(self, request: Request) -> Response:
+        api_token = self.bot.config["api_token"]
+        if not api_token:
+            return json_response(
+                {"errcode": "M_NOT_FOUND", "error": "API is disabled"}, status=404
+            )
+        elif request.headers.get("Authorization") != f"Bearer {api_token}":
+            return json_response(
+                {"errcode": "M_UNKNOWN_TOKEN", "error": "Invalid API token"}, status=401
+            )
+        else:
+            return json_response(
+                {server: list(user_ids) for server, user_ids in self.server_to_mxids.items()}
+            )
 
     @command.new("ping-users-without-server-in-name")
     async def ping_users_without_server_in_name(self, evt: MessageEvent) -> None:

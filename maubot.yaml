@@ -9,3 +9,4 @@ extra_files:
 - base-config.yaml
 - tlds-alpha-by-domain.txt
 config: true
+webapp: true

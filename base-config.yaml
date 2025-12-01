@@ -8,6 +8,8 @@ application_pings:
 excluded_members:
 - "@admin:example.com"
 
+api_token:
+
 messages:
     prefix: >
         Hello {user}, welcome to the Muninn Hall screening room.

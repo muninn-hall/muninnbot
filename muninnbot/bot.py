@@ -51,6 +51,7 @@ class Config(BaseProxyConfig):
         helper.copy("room_via")
         helper.copy("application_pings")
         helper.copy("excluded_members")
+        helper.copy("api_token")
 
         helper.copy("messages.prefix")
         helper.copy("messages.recheck_prefix")
