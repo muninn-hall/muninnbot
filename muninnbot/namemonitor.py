@@ -21,7 +21,7 @@ from aiohttp.web import Request, Response, json_response
 
 from maubot import MessageEvent
 from maubot.handlers import command, event, web
-from mautrix.types import EventType, MatrixURI, Membership, StateEvent, UserID
+from mautrix.types import EventType, MatrixURI, Membership, MessageType, StateEvent, UserID
 from mautrix.util import background_task
 
 if TYPE_CHECKING:
@@ -132,7 +132,7 @@ class NameMonitor:
             self.bot.config["messages.name_not_set"].format(
                 mentions_html=", ".join(htmls), alerts_link=alerts_link
             ),
-            extra_content={"m.mentions": {"user_ids": user_ids}},
+            extra_content={"m.mentions": {"user_ids": user_ids}, "msgtype": MessageType.TEXT},
             allow_html=True,
             markdown=False,
         )
